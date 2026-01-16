@@ -1,6 +1,8 @@
+INC_DIR := include
+
 # Compiler and flags
 CC := gcc
-CFLAGS := -Wall -std=c99 -Ibuild/external/raylib/src -I/usr/include/SDL2 -DPLATFORM_DESKTOP_SDL
+CFLAGS := -Wall -std=c99 -O2 -I$(INC_DIR) -Ibuild/external/raylib/src -I/usr/include/SDL2 -DPLATFORM_DESKTOP_SDL
 LDFLAGS := -lSDL2 -lm -ldl -lpthread -lGL -lrt -lX11
 
 # Paths
@@ -11,11 +13,11 @@ RAYLIB_DIR := build/external/raylib
 RAYLIB_LIB := $(RAYLIB_DIR)/src/libraylib.a
 
 # Sources and objects
-SRCS := $(wildcard $(SRC_DIR)/*.c)
+SRCS := $(wildcard $(SRC_DIR)/*.c) $(wildcard $(INC_DIR)/*.c)
 OBJS := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 
 # Output executable
-TARGET := $(BIN_DIR)/my_game
+TARGET := $(BIN_DIR)/game
 
 .PHONY: all clean directories
 
