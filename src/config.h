@@ -24,14 +24,16 @@ enum OPTION_BLOCK_NAMES : u8 {
 };
 
 typedef struct {
-	char *key;
-	void *control;
+	char key[64];
+	i32 *control;
 
 	i32 val;
 
 	u8 value_type;
 
 } Option;
+
+Option OptionCreate(char *key, void *control, u8 val_type);
 
 typedef struct {
 	Option *entries;	
@@ -50,6 +52,8 @@ u16 Probe(u16 id, u16 attempt, u16 size);
 void OptionTableResize(OptionTable *table);
 void OptionTableInsert(OptionTable *table, Option entry);
 
+Option *OptionTableSearch(OptionTable *table, char *key);
+
 typedef struct {
 	u32 window_width, window_height;
 	u32 target_fps;
@@ -62,7 +66,7 @@ void ConfigInit(Config *conf);
 void ConfigClose(Config *conf);
 
 void ConfigRead(Config *conf, char *path);
-void ConfigParseLine(Config *conf, char *line, u8 print);
+void ConfigParseLine(Config *conf, char *line, u8 block, u8 print);
 
 void ConfigPrintComment(char *comment);
 

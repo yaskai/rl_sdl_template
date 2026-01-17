@@ -6,11 +6,23 @@
 #include "../include/log_message.h"
 #include "../include/ansi_codes.h"
 
+Option OptionCreate(char *key, void *control, u8 val_type) {
+	Option option = (Option) {0};
+
+	memset(option.key, '\0', sizeof(option.key));
+	memcpy(option.key, key, strlen(key));
+
+	option.control = control;
+	option.value_type = val_type;
+
+	return option;
+}
+
 OptionTable OptionTableCreate() {
 	return (OptionTable) {
-		.capacity = 2,
+		.capacity = 32,
 		.count = 0,
-		.entries = calloc(2, sizeof(Option))
+		.entries = calloc(32, sizeof(Option))
 	};
 }
 
@@ -36,7 +48,7 @@ void OptionTableResize(OptionTable *table) {
 	// Copy entries to their correct indices in temp array 
 	for(u16 i = 0; i < table->capacity; i++) {
 		Option entry = table->entries[i];
-		if(!entry.key) continue; 
+		if(entry.key[0] == '\0') continue; 
 
 		u16 id = OptionTableHash(entry.key) % new_cap;
 		new_entries[id] = entry;
@@ -55,15 +67,16 @@ void OptionTableResize(OptionTable *table) {
 }
 
 void OptionTableInsert(OptionTable *table, Option entry) {
+	if(table->count + 1 > table->capacity) 
+		OptionTableResize(table);
+
 	u16 id = OptionTableHash(entry.key) % table->capacity;
 	u16 attempt = 0;
 
 	while(attempt < table->capacity) {
-		if(table->entries[id].key) { 
-			if(!streq(table->entries[id].key, entry.key)) {;
-				id = Probe(id, ++attempt, table->capacity); 
-				continue;
-			}
+		if(!streq(table->entries[id].key, entry.key)) {;
+			id = Probe(id, ++attempt, table->capacity); 
+			continue;
 		}
 
 		break;
@@ -73,14 +86,44 @@ void OptionTableInsert(OptionTable *table, Option entry) {
 	table->count++;
 }
 
+Option *OptionTableSearch(OptionTable *table, char *key) {
+	printf("Search() -> %s\n", key);
+
+	Option *option = NULL;
+
+	char str_key[64] = { '\0' };
+	memcpy(str_key, key, strlen(key));
+
+	u16 id = OptionTableHash(str_key) % table->capacity;	
+	u16 attempt = 0;
+
+	while(attempt < table->capacity) {
+		if(streq(table->entries[id].key, str_key)) {
+			printf("option found -> %s\n", str_key);
+			option = &table->entries[id];
+			break;
+		}
+
+		id = Probe(id, ++attempt, table->capacity);
+	}
+
+	return option;
+}
+
 void ConfigInit(Config *conf) {
 	for(u8 i = 0; i < OPTION_BLOCK_COUNT; i++) 
 		conf->option_tables[i] = OptionTableCreate();
 
-	Option opt_ww = (Option) {
-	};
+	Option opt_ww = OptionCreate("width", &conf->window_width, VAL_INT);
 	OptionTableInsert(&conf->option_tables[OPT_BLOCK_WINDOW], opt_ww);
 	
+	Option opt_wh = OptionCreate("height", &conf->window_height, VAL_INT);
+	OptionTableInsert(&conf->option_tables[OPT_BLOCK_WINDOW], opt_wh);
+
+	for(u8 i = 0; i < conf->option_tables[0].capacity; i++) {
+		puts("--------------------");
+		printf("%d: %s\n", i, conf->option_tables[0].entries[i].key);
+	}
 }
 
 void ConfigClose(Config *conf) {
@@ -98,16 +141,33 @@ void ConfigRead(Config *conf, char *path) {
 	}
 
 	// Read file content by line
+	u8 block = 0;
 	char line[128];
 	while(fgets(line, sizeof(line), pF)) {
-		ConfigParseLine(conf, line, 1);
+		ConfigParseLine(conf, line, block, 1);
 	}
 
 	// Close file
 	fclose(pF);
 }
 
-void ConfigParseLine(Config *conf, char *line, u8 print) {
+void ConfigParseLine(Config *conf, char *line, u8 block, u8 print) {
+	char *block_open = strchr(line, BLOCK_OPEN_MARKER);
+	char *block_close = strchr(line, BLOCK_CLOSE_MARKER);
+
+	if(block_open && block_close) {
+		char block_name[64] = { '\0' };
+		memcpy(block_name, line + 1, strlen(line) - 2);
+
+		if(streq(block_name, "window")) {
+			block = OPT_BLOCK_WINDOW;	
+		} else if(streq(block_name, "other")) {
+			block = OPT_BLOCK_OTHER;	
+		}
+	}
+
+	OptionTable *table = &conf->option_tables[block];
+
 	char *comment = strchr(line, COMMENT_MARKER);	
 	if(comment) *comment = '\0';
 
@@ -122,8 +182,44 @@ void ConfigParseLine(Config *conf, char *line, u8 print) {
 	if(!eq) return;
 
 	*eq = '\0';
-	char *val = line;
-	char *key = eq + 1;
+	char *key = line;
+	char *val = eq + 1;
+
+	u16 id = OptionTableHash(key) % table->capacity; 
+
+	Option *option = OptionTableSearch(table, key);
+	if(!option) return;	
+	
+	switch(table->entries[id].value_type) {
+		case VAL_INT: {
+			i32 i = 0; 
+			sscanf(val, "%d", &i);
+
+			option->val = i;
+			*option->control = i;
+
+		} break;
+
+		case VAL_FLOAT: {
+			float f = 0;
+			sscanf(val, "%f", &f);
+
+		} break;
+
+		case VAL_BOOL: {
+			bool b = 0;
+			b = (streq(val, "true"));
+
+		} break;
+
+		case VAL_STRING: {
+
+		} break;
+
+		case VAL_HEX: {
+
+		} break;
+	}
 }
 
 void ConfigPrintComment(char *comment) {

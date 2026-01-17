@@ -3,12 +3,13 @@
 
 int main() {
 	Config conf = (Config) {0};
+	ConfigInit(&conf);
 	ConfigRead(&conf, "options.conf");
 
 	SetTraceLogLevel(LOG_NONE);
 	SetConfigFlags(FLAG_WINDOW_HIGHDPI);
 
-	InitWindow(1280, 800, "Raylib Project");
+	InitWindow(conf.window_width, conf.window_height, "Raylib Project");
 	//SetTargetFPS(60);
 
 	while(!WindowShouldClose()) {
